@@ -3,37 +3,39 @@ const {
   Model
 } = require('sequelize');
 module.exports = (sequelize, DataTypes) => {
-  class Avatar extends Model {
+  class avatar extends Model {
     /**
      * Helper method for defining associations.
      * This method is not a part of Sequelize lifecycle.
      * The `models/index` file will call this method automatically.
      */
-    static associate(models) {
+    static associate({User}) {
       // define association here
+      this.belongsTo(User , { foreignKey : 'userId' , as: 'user'})
     }
   };
-  Avatar.init({
-    filename: {
+  avatar.init({
+    filename: { 
+      type: DataTypes.STRING,
+      allowNull:false,
+      unique:true
+    },
+    filepath: { 
       type: DataTypes.STRING,
       allowNull:false
     },
-    filepath: {
+    mimetype:{ 
       type: DataTypes.STRING,
       allowNull:false
     },
-    mimetype: {
-      type: DataTypes.STRING,
-      allowNull:false
-    },
-    size: {
+    size: { 
       type: DataTypes.BIGINT,
       allowNull:false
-    }
+    },
   }, {
     sequelize,
-    tableName: 'avatar_images',
-    modelName: 'Avatar',
+    tableName: 'avatars',
+    modelName: 'avatar',
   });
-  return Avatar;
+  return avatar;
 };

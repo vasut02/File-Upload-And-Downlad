@@ -2,7 +2,7 @@
   "development": {
     "username": "vasu",
     "password": "password",
-    "database": "sequelize_db",
+    "database": "files_upload",
     "host": "127.0.0.1",
     "dialect": "postgres"
   },
