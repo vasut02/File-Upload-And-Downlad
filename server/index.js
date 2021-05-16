@@ -17,66 +17,108 @@ var storage = multer.diskStorage({
         cb(null, 'avatars')
     },
     filename: function (req, file, cb) {
-        cb(null, file.fieldname + '-' + file.originalname + '-' + Date.now())
-        // cb(null, Date.now() + '-' + file.originalname )
+        // cb(null, file.fieldname + '-' + file.originalname + '-' + Date.now())
+        cb(null, file.fieldname + '-' + file.originalname.split('.')[0] + '-' + Date.now())
+        // cb(null, `${new Date().getTime()}_${file.originalname}`);
     }
 })
 
-var upload = multer({ storage: storage })
+/* 
+*   for storing at differnet destination
 
-const axios = require('axios');
+*    destination: (req, file, callback) => {
+*    let type = req.params.type;
+*    let path = `./uploads/${type}`;
+*    fs.mkdirsSync(path);
+*    callback(null, path);
+*    },
+* */
 
-// post user 
-app.post('/users', upload.single('File'), async (req, res) => {
+var upload = multer({
+    storage: storage,
+    limits: {
+        fileSize: 1000000 // max file size 10MB = 1000000 bytes
+    },
+    fileFilter(req, file, cb) {
+        if (!file.originalname.match(/\.(jpeg|jpg|png|pdf|doc|docx|xlsx|xls)$/)) {
+            return cb(
+                new Error(
+                    'only upload files with jpg, jpeg, png, pdf, doc, docx, xslx, xls format.'
+                )
+            );
+        }
+        cb(undefined, true); // continue with upload
+    }
+});
 
+const save_file = async (data) => {
+
+    //return rne promise for saving file
+    return new Promise(async (resolve, reject) => {
+
+        // perofrm necessary function
+        const { filename, filepath, mimetype, size, userId } = data
+        try {
+            const avatr = await avatar.create({ filename, filepath, mimetype, size, userId })
+            resolve(avatr);
+        } catch (err) {
+            console.log('/save firl', err);
+            reject({
+                success: false,
+                message: 'upload failed',
+                stack: err.stack,
+            })
+        }
+    })
+}
+
+app.post('/upload', upload.single('File'), async (req, res) => {
+    
     //get file data and then user from form data 
     const { filename, mimetype, size } = req.file;
     const filepath = req.file.path;
 
     const { firstName, lastName, email } = req.body
+
     try {
 
         // try creating usere first
         const user = await User.create({ firstName, lastName, email })
 
-        //create user and send the file data to be posted in databse 
         if (user) {
-
-            //send required data
             const data = { filename, filepath, mimetype, size, userId: user.id }
-            console.log(data);
-            axios.post('http://localhost:8000/avatar', data).then((result) => {
-                console.log('avatar result', result.json);
-                res.json(user);
-            }).catch((err) => {
-                console.log('/post users ', err);
-                return res.status(500).json(err);
+            save_file(data).then((result) => {
+                console.log('file uploaded successfully.', result.dataValues);
+                return res.send('file uploaded successfully.');
+            }).catch((error) => {
+                console.log('/upload', error);
+                res.status(400).send('Error while uploading file. Try again later.');
             })
         }
-    } catch (err) {
-        console.log('/post users ', err);
-        return res.status(500).json(err);
+
+    } catch (error) {
+        console.log('/upload', error);
+        res.status(400).send('Error while uploading file. Try again later.');
     }
-})
+},
+    (error, req, res, next) => {
+        if (error) {
+            console.log('/upload', error);
+            res.status(500).send(error.message);
+        }
+    }
+);
 
-app.post('/avatar', async (req, res) => {
-    const { filename, filepath, mimetype, size, userId } = req.body
-
-    console.log('as', req.body);
+app.get('/getAllFiles', async (req, res) => {
     try {
-        const avatr = await avatar.create({ filename, filepath, mimetype, size, userId })
-        return res.json({ avatr });
-    } catch (err) {
-        console.log('/avatar post ', err);
-        res.json({
-            success: false,
-            message: 'upload failed',
-            stack: err.stack,
-        })
+      const files = await User.findAll({include: 'avatar' , order: [['createdAt', 'DESC']]});
+      res.send(files);
+    } catch (error) {
+      res.status(400).send('Error while getting list of files. Try again later.');
     }
-});
+  });
 
-app.get('/user/:id', (req, res) => {
+app.get('/download/:id', (req, res) => {
     const { id } = req.params;
 
     User.findOne({ where: { id }, include: 'avatar' }).then((user) => {
@@ -104,6 +146,7 @@ app.get('/user/:id', (req, res) => {
             })
     })
 })
+
 // Image Get Routes
 app.get('/image/:id', (req, res) => {
 
